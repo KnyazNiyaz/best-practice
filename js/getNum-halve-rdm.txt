@@ -1,0 +1,105 @@
+# High performance array transformation
+
+```sh 
+const counter = {
+  next: 0,
+  step() {
+    return ++this.next;
+  },
+  reset() {
+    this.next = 0;
+  }
+};
+
+const bigArray = new Array(100000).fill(0);
+
+const getNum = () => counter.step();
+const halve = x => x / 2;
+const isInt = x => Math.floor(x) === x;
+
+bigArray
+  .map(getNum)
+  .map(halve)
+  .filter(isInt);
+```
+
+// Unfortunately, if we literally translate this into our code, we have to iterate over the array exactly 3 times
+
+```sh
+bigArray.reduce(newArr => {
+  const x = getNum();
+  const hlv = halve(x);
+  if (isInt(hlv)) {
+    newArr.push(hlv);
+  }
+  return newArr;
+}, []);
+```
+
+The first fix is actually technically correct. reduce() is the way to reduce the number of iterations. That’s not why it’s called ‘reduce’, but why not, you can think of it that way if it helps.
+
+```sh
+bigArray.reduce((newArr, member) => {
+  return newArr.concat(
+    [member]
+      .map(getNum)
+      .map(halve)
+      .filter(isInt)
+  );
+}, []);
+```
+
+The result is still not as nice as could be, though so let’s clean it up a bit:
+
+```sh
+const transform = (arr, transformations) => 
+  arr.reduce(
+    (newArr, member) => newArr.concat(transformations([member])),
+    []
+  );
+transform(bigArray, arr => 
+  arr
+    .map(getNum)
+    .map(halve)
+    .filter(isInt)
+);
+```
+
+Array.prototype.concat() is really slow than the naive approach, let’s replace with push()
+
+```sh
+const transform = (arr, transformer) =>
+  arr.reduce((newArr, member) => {
+    const t = transformer([member]);
+    if (t.length) {
+      newArr.push(t[0]);
+    }
+    return newArr;
+  }, []);
+transform(bigArray, arr => 
+  arr
+    .map(getNum)
+    .map(halve)
+    .filter(isInt)
+);
+```
+
+What about generators?
+
+```sh
+const map = function* (arr, fn) {
+    for (let member of arr) {
+        yield fn(member);
+    }
+};
+const filter = function* (arr, fn) {
+    for (let member of arr) {
+        if (fn(member)) {
+            yield arr;
+        }
+    }
+};
+const nums = map(bigArray, getNum);
+const hlv = map(rnd, halve);
+[...filter(hlv, isInt)];
+```
